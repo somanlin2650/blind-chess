@@ -1,0 +1,721 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>盲棋大亂鬥 · 象棋揭棋變體</title>
+<meta name="description" content="中國象棋大盤的盲棋玩法：除主帥外全部覆蓋、打散重洗，暗子依原位走法行動，移動後翻面揭曉真身。">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&family=Noto+Serif+TC:wght@600;900&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --ink:#16120d; --ink-2:#211b14; --ink-3:#2c241a;
+    --board:#e7c98c; --board-line:#5a401e; --board-edge:#3a2a13;
+    --paper:#f3ead2; --zhu:#c7372c; --zhu-deep:#7c2019;
+    --dai:#1c1712; --dai-ink:#15110c;
+    --gold:#c9a24b; --gold-bright:#ecc878; --gold-faint:rgba(201,162,75,.16);
+    --jade:#3f8f72; --jade-bright:#62d0a6;
+    --amber:#e8a24b; --amber-bright:#ffc472;
+    --txt:#e8dcc0; --txt-dim:#a89773;
+    --shadow:0 12px 30px rgba(0,0,0,.45);
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  html,body{margin:0;height:100%;}
+  body{
+    font-family:"Noto Sans TC",system-ui,sans-serif;
+    background:radial-gradient(120% 80% at 50% -10%, #2a2114 0%, var(--ink) 55%), var(--ink);
+    color:var(--txt); min-height:100%;
+    display:flex; flex-direction:column; align-items:center;
+    padding:12px 10px calc(18px + env(safe-area-inset-bottom));
+    overflow-x:hidden;
+  }
+  .wrap{width:100%; max-width:460px; display:flex; flex-direction:column; gap:10px;}
+
+  .masthead{ text-align:center; }
+  .masthead h1{
+    font-family:"Noto Serif TC",serif; font-weight:900;
+    font-size:clamp(27px,8vw,38px); letter-spacing:.14em; margin:0; color:var(--paper);
+    text-shadow:0 2px 0 var(--zhu-deep), 0 0 22px rgba(199,55,44,.25);
+  }
+  .masthead h1 .vs{ color:var(--zhu); }
+  .masthead .sub{ margin-top:3px; font-size:11px; letter-spacing:.32em; color:var(--gold);}
+  .masthead .rule-link{ background:none;border:none;color:var(--txt-dim);font:inherit;font-size:12px;
+    text-decoration:underline;text-underline-offset:3px;cursor:pointer;margin-top:5px;}
+
+  .hud{ display:grid; grid-template-columns:1fr auto 1fr; gap:8px; align-items:stretch;}
+  .seat{ background:linear-gradient(180deg,var(--ink-2),var(--ink));
+    border:1.5px solid var(--gold-faint); border-radius:13px; padding:8px 11px; transition:.25s;}
+  .seat.active{ border-color:var(--gold); box-shadow:0 0 0 1px var(--gold),0 0 20px rgba(201,162,75,.16);}
+  .seat.right{ text-align:right;}
+  .seat .who{ display:flex; align-items:center; gap:7px; font-weight:700; font-size:14px;}
+  .seat.right .who{ flex-direction:row-reverse;}
+  .chip{ width:15px;height:15px;border-radius:50%;flex:0 0 auto;}
+  .chip.red{ background:radial-gradient(circle at 35% 30%,#e7584d,var(--zhu)); }
+  .chip.black{ background:radial-gradient(circle at 35% 30%,#4a3f30,#0d0a07); border:1px solid #6b5b44;}
+  .seat .meta{ font-size:11px; color:var(--txt-dim); margin-top:3px;}
+  .seat .meta b{ color:var(--paper); font-variant-numeric:tabular-nums;}
+  .vsbadge{ display:flex;align-items:center;justify-content:center;
+    font-family:"Noto Serif TC",serif;font-weight:900;font-size:13px;color:var(--zhu);
+    writing-mode:vertical-rl; letter-spacing:.1em; text-shadow:0 0 12px rgba(199,55,44,.5);}
+
+  .status{ text-align:center; font-size:13px; min-height:18px; color:var(--txt); font-weight:500;}
+  .status .hot{ color:var(--gold-bright); font-weight:700;}
+  .status .warn{ color:#ff7a6b; font-weight:700;}
+
+  .board-frame{
+    background:linear-gradient(150deg,#4a3416,#2c1e0c);
+    border:2px solid var(--gold-faint); border-radius:14px; padding:8px;
+    box-shadow:var(--shadow); position:relative;
+  }
+  svg.board{ width:100%; height:auto; display:block; touch-action:manipulation;}
+  svg.board text{ pointer-events:none; font-family:"Noto Serif TC",serif; font-weight:900;}
+
+  .tray{ display:flex; align-items:center; gap:5px; flex-wrap:wrap; min-height:34px;
+    padding:6px 9px; background:linear-gradient(180deg,var(--ink-2),var(--ink));
+    border:1.5px solid var(--gold-faint); border-radius:11px;}
+  .tray-label{ font-size:11px; color:var(--txt-dim); margin-right:3px; letter-spacing:.12em; flex:0 0 auto;}
+  .tray-empty{ font-size:11px; color:var(--txt-dim);}
+  .cap{ width:23px; height:23px; border-radius:50%; flex:0 0 auto;
+    display:flex; align-items:center; justify-content:center;
+    font-family:"Noto Serif TC",serif; font-weight:900; font-size:13px;
+    background:var(--paper); box-shadow:inset 0 0 0 1.5px currentColor;}
+  .cap.red{ color:var(--zhu);} .cap.black{ color:var(--dai-ink);}
+  .cap.fresh{ outline:2px solid var(--amber-bright); outline-offset:1px;
+    box-shadow:inset 0 0 0 1.5px currentColor, 0 0 10px var(--amber); animation:capglow 1.1s ease-in-out infinite;}
+  @keyframes capglow{50%{box-shadow:inset 0 0 0 1.5px currentColor, 0 0 16px var(--amber-bright);}}
+
+  .controls{ display:flex; gap:8px;}
+  button.act{ flex:1; font:inherit; font-weight:700; font-size:14px; letter-spacing:.04em;
+    padding:12px 8px; border-radius:12px; cursor:pointer; color:var(--ink);
+    background:linear-gradient(180deg,var(--gold-bright),var(--gold)); border:none;
+    box-shadow:0 4px 0 var(--zhu-deep), var(--shadow); transition:transform .08s, box-shadow .08s;}
+  button.act:active{ transform:translateY(3px); box-shadow:0 1px 0 var(--zhu-deep);}
+  button.act.ghost{ background:linear-gradient(180deg,var(--ink-2),var(--ink)); color:var(--txt);
+    box-shadow:0 4px 0 #000, inset 0 0 0 1.5px var(--gold-faint);}
+  button.act.ghost .on{ color:var(--gold-bright);}
+
+  .modal-bg{ position:fixed; inset:0; background:rgba(8,6,4,.74); backdrop-filter:blur(3px);
+    display:none; align-items:center; justify-content:center; z-index:60; padding:16px;}
+  .modal-bg.show{ display:flex;}
+  .modal{ background:linear-gradient(180deg,var(--ink-2),#120e09); border:1.5px solid var(--gold);
+    border-radius:16px; max-width:400px; width:100%; padding:20px; box-shadow:var(--shadow);
+    max-height:86vh; overflow:auto;}
+  .modal h2{ font-family:"Noto Serif TC",serif; margin:0 0 10px; color:var(--gold-bright); font-size:21px; letter-spacing:.08em;}
+  .modal p,.modal li{ font-size:13px; line-height:1.62; color:var(--txt);}
+  .modal ul{ padding-left:18px; margin:6px 0;}
+  .modal .close{ width:100%; margin-top:12px;}
+  .winbanner{ text-align:center;} .winbanner .crown{ font-size:38px;}
+
+  .toast{ position:fixed; left:50%; bottom:calc(78px + env(safe-area-inset-bottom)); transform:translateX(-50%) translateY(14px);
+    background:var(--ink-2); border:1.5px solid var(--gold); color:var(--paper);
+    padding:9px 16px; border-radius:999px; font-weight:700; font-size:14px; letter-spacing:.04em;
+    box-shadow:var(--shadow); opacity:0; pointer-events:none; transition:.25s; z-index:50; white-space:nowrap;}
+  .toast.show{ opacity:1; transform:translateX(-50%) translateY(0);}
+  .toast .r{ color:var(--zhu);} .toast .b{ color:#d9cba8;}
+
+  @media (prefers-reduced-motion: reduce){ *{animation:none !important; transition:none !important;} }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="masthead">
+    <h1>盲棋<span class="vs">大亂鬥</span></h1>
+    <div class="sub">象 棋 揭 棋 變 體 · v10</div>
+    <button class="rule-link" id="rulesBtn">玩法說明</button>
+  </div>
+
+  <div class="hud">
+    <div class="seat" id="seat0">
+      <div class="who"><span class="chip red"></span><span id="name0">紅方</span></div>
+      <div class="meta">明子 <b id="up0">0</b>　暗子 <b id="dn0">15</b></div>
+    </div>
+    <div class="vsbadge">對決</div>
+    <div class="seat right" id="seat1">
+      <div class="who"><span class="chip black"></span><span id="name1">黑方</span></div>
+      <div class="meta">明子 <b id="up1">0</b>　暗子 <b id="dn1">15</b></div>
+    </div>
+  </div>
+
+  <div class="status" id="status">紅方先手 — 點任一暗子(依原位走法行動)或移動主帥</div>
+
+  <div class="board-frame">
+    <svg class="board" id="board" xmlns="http://www.w3.org/2000/svg"></svg>
+  </div>
+
+  <div class="tray" id="tray"></div>
+
+  <div class="controls">
+    <button class="act" id="newBtn">新局</button>
+    <button class="act ghost" id="modeBtn">對手：<span class="on" id="modeLabel">本機雙人</span></button>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<div class="modal-bg" id="rulesModal">
+  <div class="modal">
+    <h2>盲棋大亂鬥</h2>
+    <p>中國象棋大盤的盲棋玩法。開局把<b>主帥以外的 30 顆棋(紅黑混在一起)打散重洗</b>,面朝下蓋在大盤原位;<b>背面看不出真實顏色</b>。只有雙方主帥是翻開的。紅方先手,輪流走一步。</p>
+    <p style="color:var(--gold-bright)"><b>暗子(盲棋狀態)</b></p>
+    <ul>
+      <li><b>視為它所在「位子」的棋種與陣營</b>:在你半邊的暗子由你移動,並依該位子的棋種走法(車位走車、炮位走炮…)。</li>
+      <li>暗子移動時可吃任何子(敵方明子、任何暗子);<b>但不能吃已翻開的己方明子</b>。</li>
+      <li>一旦移動或吃子就<b>翻面揭曉真身</b> —— 真身的棋種與顏色都是隨機的,<b>可能是對方的子</b>(等於幫對方翻出一子)。翻面後即歸真身顏色。</li>
+    </ul>
+    <p style="color:var(--gold-bright)"><b>明子(已翻面)</b></p>
+    <ul>
+      <li>依真身正規象棋走法,只有真身顏色的玩家能動,不能吃自己陣營的子。</li>
+      <li><b>象永遠不能過河</b>:翻面後若身在對岸,就被困在對岸、回不了本岸。</li>
+      <li><b>士</b>:翻面後若在九宮內,就出不了該九宮;在九宮外則不受限。</li>
+    </ul>
+    <p style="color:var(--gold-bright)"><b>禁著與勝負</b></p>
+    <ul>
+      <li>會讓自己主帥被「已翻開的敵子」吃掉(送帥)的走法是<b>禁著</b>,不能走。暗子未知造成的死亡不算禁著。</li>
+      <li>吃掉對方主帥即獲勝;若輪到一方<b>沒有任何合法著</b>可走,該方判負。</li><li><b>長將禁著</b>:不可連續將軍逼成同一將軍局面第三次(須變著,變不出則判負)。非將軍的<b>同一局面三次重複</b>、或久無進展(無吃子也無翻子)即<b>和局</b>。</li><li>被吃的子會還原顯示在下方,並標示上一手軌跡。</li>
+      <li>每步會以<b>琥珀色標記上一手</b>(起點虛框、終點亮圈),最新被吃的子在下方<b>高亮</b>,方便接手判讀。對電腦可選<b>普通 / 困難</b>(困難較強、思考約 1 秒)。</li>
+    </ul>
+    <button class="act close" id="closeRules">開戰</button>
+  </div>
+</div>
+
+<div class="modal-bg" id="winModal">
+  <div class="modal winbanner">
+    <div class="crown">🏆</div>
+    <h2 id="winTitle">勝負已分</h2>
+    <p id="winDesc"></p>
+    <button class="act close" id="winNew">再來一局</button>
+  </div>
+</div>
+
+<script>
+/* ===================== 規則核心（純函式，9欄×10列） ===================== */
+const COLS=9, ROWS=10, N=COLS*ROWS;
+const DIRS4=[[-1,0],[1,0],[0,-1],[0,1]];
+function rc(i){ return [Math.floor(i/COLS), i%COLS]; }
+function ix(r,c){ return r*COLS+c; }
+function inB(r,c){ return r>=0&&r<ROWS&&c>=0&&c<COLS; }
+
+const NAMES={
+  red:{R:'俥',H:'傌',E:'相',A:'仕',G:'帥',C:'炮',S:'兵'},
+  black:{R:'車',H:'馬',E:'象',A:'士',G:'將',C:'包',S:'卒'}
+};
+const VALUE={G:1000,R:9,C:4.5,H:4.5,E:2.5,A:2.5,S:2};
+
+// 標準大盤原位（決定暗子的「原位走法」與顏色方向）
+function standardLayout(){
+  const lay=new Array(N).fill(null);
+  const back=['R','H','E','A','G','A','E','H','R'];
+  for(let c=0;c<9;c++){ lay[ix(0,c)]={type:back[c],color:'black'}; lay[ix(9,c)]={type:back[c],color:'red'}; }
+  lay[ix(2,1)]={type:'C',color:'black'}; lay[ix(2,7)]={type:'C',color:'black'};
+  lay[ix(7,1)]={type:'C',color:'red'};  lay[ix(7,7)]={type:'C',color:'red'};
+  for(const c of [0,2,4,6,8]){ lay[ix(3,c)]={type:'S',color:'black'}; lay[ix(6,c)]={type:'S',color:'red'}; }
+  return lay;
+}
+// 真隨機：用 crypto（非偽隨機、不受種子影響），確保每局都不同
+function rnd(max){
+  if(window.crypto && window.crypto.getRandomValues){
+    const u=new Uint32Array(1), limit=Math.floor(0x100000000/max)*max; let x;
+    do{ window.crypto.getRandomValues(u); x=u[0]; }while(x>=limit);
+    return x%max;
+  }
+  return Math.floor(Math.random()*max);
+}
+function shuffle(a){ for(let i=a.length-1;i>0;i--){ const j=rnd(i+1); [a[i],a[j]]=[a[j],a[i]]; } return a; }
+
+// 建立棋盤：主帥翻開在原位；其餘 30 顆真身(紅15+黑15)全部混在一起打散，蓋在大盤原位
+// 盲棋狀態 = 視為「位子」的棋種(roleType)與陣營(roleColor)；真身(type/color)隨機，翻面才揭曉
+function setupBoard(){
+  const lay=standardLayout();
+  const board=new Array(N).fill(null);
+  const hidden=[];
+  for(const color of ['red','black']){
+    const set={R:2,H:2,E:2,A:2,C:2,S:5};
+    for(const t in set){ for(let k=0;k<set[t];k++) hidden.push({type:t,color}); }
+  }
+  shuffle(hidden);
+  let h=0;
+  for(let i=0;i<N;i++){
+    const o=lay[i]; if(!o) continue;
+    if(o.type==='G'){ board[i]={type:'G',color:o.color,revealed:true,roleType:'G',roleColor:o.color}; }
+    else { const t=hidden[h++];
+      board[i]={type:t.type,color:t.color,revealed:false,roleType:o.type,roleColor:o.color}; }
+  }
+  return board;
+}
+
+// 區域判斷
+function inPalace(i,color){ const [r,c]=rc(i); const r0=color==='red'?7:0, r1=color==='red'?9:2; return r>=r0&&r<=r1&&c>=3&&c<=5; }
+function whichPalace(i){ const [r,c]=rc(i); if(c<3||c>5)return null; if(r>=0&&r<=2)return 'top'; if(r>=7&&r<=9)return 'bottom'; return null; }
+function riverSide(r){ return r<=4?'top':'bottom'; }
+
+// 幾何走法（純位置決定）：象永不過河 → 困於目前所在的一岸；
+// 士在某九宮內 → 困於該九宮，在九宮外 → 不受限。盲棋與明子皆同(以目前位置判斷)。
+function geo(board, i, type, color){
+  const [r,c]=rc(i); const moves=[],caps=[]; const occ=j=>board[j];
+  if(type==='R'){
+    for(const[dr,dc]of DIRS4){ let nr=r+dr,nc=c+dc;
+      while(inB(nr,nc)){ const j=ix(nr,nc); if(!occ(j))moves.push(j); else{caps.push(j);break;} nr+=dr;nc+=dc; } }
+  } else if(type==='C'){
+    for(const[dr,dc]of DIRS4){ let nr=r+dr,nc=c+dc,jumped=false;
+      while(inB(nr,nc)){ const j=ix(nr,nc);
+        if(!jumped){ if(!occ(j))moves.push(j); else jumped=true; }
+        else { if(occ(j)){caps.push(j);break;} }
+        nr+=dr;nc+=dc; } }
+  } else if(type==='H'){
+    for(const[dr,dc]of [[-2,-1],[-2,1],[2,-1],[2,1],[-1,-2],[1,-2],[-1,2],[1,2]]){
+      const nr=r+dr,nc=c+dc; if(!inB(nr,nc))continue;
+      const lr=r+(Math.abs(dr)===2?dr/2:0), lc=c+(Math.abs(dc)===2?dc/2:0);
+      if(occ(ix(lr,lc)))continue;
+      const j=ix(nr,nc); if(!occ(j))moves.push(j); else caps.push(j); }
+  } else if(type==='E'){
+    const side=riverSide(r); // 目前所在的一岸
+    for(const[dr,dc]of [[-2,-2],[-2,2],[2,-2],[2,2]]){
+      const nr=r+dr,nc=c+dc; if(!inB(nr,nc))continue;
+      if(occ(ix(r+dr/2,c+dc/2)))continue;        // 塞象眼
+      if(riverSide(nr)!==side) continue;          // 象永不過河（困於此岸）
+      const j=ix(nr,nc); if(!occ(j))moves.push(j); else caps.push(j); }
+  } else if(type==='A'){
+    const pal=whichPalace(i); // 目前所在九宮（null=在九宮外）
+    for(const[dr,dc]of [[-1,-1],[-1,1],[1,-1],[1,1]]){
+      const nr=r+dr,nc=c+dc; if(!inB(nr,nc))continue;
+      const j=ix(nr,nc);
+      if(pal!==null && whichPalace(j)!==pal) continue; // 在九宮內 → 限於該九宮
+      if(!occ(j))moves.push(j); else caps.push(j); }
+  } else if(type==='G'){
+    for(const[dr,dc]of DIRS4){ const nr=r+dr,nc=c+dc; if(!inB(nr,nc))continue;
+      const j=ix(nr,nc); if(!inPalace(j,color))continue;
+      if(!occ(j))moves.push(j); else caps.push(j); }
+    for(const dr of [-1,1]){ let nr=r+dr; // 飛將
+      while(inB(nr,c)){ const j=ix(nr,c);
+        if(occ(j)){ const p=board[j]; if(p.revealed&&p.type==='G'&&p.color!==color)caps.push(j); break; }
+        nr+=dr; } }
+  } else if(type==='S'){
+    const fwd=color==='red'?-1:1;
+    const crossed=color==='red'?(r<=4):(r>=5);
+    const cand=[[fwd,0]]; if(crossed){cand.push([0,-1],[0,1]);}
+    for(const[dr,dc]of cand){ const nr=r+dr,nc=c+dc; if(!inB(nr,nc))continue;
+      const j=ix(nr,nc); if(!occ(j))moves.push(j); else caps.push(j); }
+  }
+  return {moves,caps};
+}
+
+function specOf(p){ return p.revealed?{type:p.type,color:p.color,covered:false}:{type:p.roleType,color:p.roleColor,covered:true}; }
+function factionOf(p){ return p.revealed ? p.color : p.roleColor; } // 盲棋視為位子的陣營
+
+// 某玩家所有「幾何上」可行的行動（尚未過濾禁著）
+function actionsFor(board, turnColor){
+  const out=[];
+  for(let i=0;i<N;i++){ const p=board[i]; if(!p)continue;
+    if(factionOf(p)!==turnColor) continue;
+    const covered=!p.revealed;
+    const s=specOf(p);
+    const g=geo(board,i,s.type,s.color);
+    for(const to of g.moves) out.push({from:i,to,covered,cap:false});
+    for(const to of g.caps){ const t=board[to];
+      // 不能吃「已翻開且同陣營」的子（看得到是自己的）；敵方明子、任何暗子(真身未知)皆可吃
+      if(!(t.revealed && t.color===turnColor)) out.push({from:i,to,covered,cap:true});
+    }
+  }
+  return out;
+}
+
+// 禁著：走完後自己的帥被「已翻開的敵子」或飛將吃到（送帥）。
+// 暗子在模擬中維持未翻 → 其威脅視為「未知」，不計入(未知導致的死亡不算禁著)。
+function isForbidden(board, act, faction){
+  const mover=board[act.from], target=board[act.to];
+  if(target && target.type==='G' && target.color!==faction) return false; // 吃對方帥=獲勝，不禁
+  const b2=board.slice();
+  b2[act.to]=mover; b2[act.from]=null;   // 暗子仍視為未翻（不會被當成攻擊方）
+  return inCheck(b2, faction);
+}
+// 真正合法的行動（已濾掉禁著）
+function legalActionsFor(board, turnColor){
+  return actionsFor(board, turnColor).filter(a=>!isForbidden(board,a,turnColor));
+}
+
+/* ============================================================
+   電腦引擎：PIMC（決定化）+ alpha-beta + Zobrist 置換表 + 靜止搜尋
+   只用公開資訊(已翻明子、已被吃、原位)推測未知子，隨機決定化後搜尋，多樣本投票。
+   ============================================================ */
+const EVAL_VAL={R:900,H:400,C:450,E:200,A:200,S:100,G:60000};
+const TYPE_I={R:0,H:1,E:2,A:3,G:4,C:5,S:6};
+const eSpecType=p=>p.revealed?p.type:p.roleType;
+const eSpecColor=p=>p.revealed?p.color:p.roleColor;
+function eGenMoves(b,side){ return actionsFor(b,side); }            // {from,to,covered,cap}
+function eGenCaptures(b,side){ return actionsFor(b,side).filter(m=>m.cap); }
+
+// Zobrist
+function _rint(){ return (Math.random()*0x100000000)>>>0; }
+const ZOB=[]; for(let i=0;i<N;i++){ ZOB[i]=new Array(28); for(let s=0;s<28;s++) ZOB[i][s]=_rint(); }
+const ZSIDE=_rint();
+const eStateIdx=p=>((TYPE_I[p.type]*2+(p.color==='red'?0:1))*2+(p.revealed?1:0));
+let curHash=0;
+function eInitHash(b,side){ let h=0; for(let i=0;i<N;i++){ const p=b[i]; if(p)h^=ZOB[i][eStateIdx(p)]; } if(side==='black')h^=ZSIDE; curHash=h>>>0; }
+
+// 位置價值表（以該子「推進深度 depth」與置中程度 cc 計算；紅黑對稱）
+function eePST(t,r,c,color){
+  const depth = color==='red'?(9-r):r;        // 0=自家底線, 9=敵方底線
+  const cc = 4-Math.abs(c-4);                  // 0=邊線, 4=中路
+  switch(t){
+    case 'S': return depth<5 ? depth*2 : 30+(depth-5)*16+cc*6;   // 過河兵、逼近敵宮大加分
+    case 'H': return cc*5 + (4-Math.abs(r-4))*3 + depth*2 - ((c===0||c===8)?20:0); // 馬喜中央、忌邊角
+    case 'R': return depth*3 + cc;                                // 車：推進與中路
+    case 'C': return (c===4?14:0) + cc*3 + depth*2;               // 炮：當頭炮、中路
+    case 'E': return cc*3 - (depth>=5?12:0);                      // 象：守中、過河略貶
+    case 'A': return (inPalace(r*COLS+c,color)?10:0) + (depth>=5?-8:0) + cc; // 士：護宮
+    case 'G': return -depth*5 + (c===4?4:0);                      // 帥：勿前出
+  }
+  return 0;
+}
+// 帥安全：護駕子數 − 被敵車(直線首子)/敵炮(隔一子)直瞄之懲罰
+function eeKing(b,color,gi){
+  if(gi<0) return -4000;
+  const r=Math.floor(gi/COLS), c=gi%COLS; let def=0,pen=0;
+  for(let i=0;i<N;i++){ const p=b[i]; if(p&&p.revealed&&p.color===color&&(p.type==='A'||p.type==='E'))def++; }
+  // 直行
+  for(const dr of[-1,1]){ let rr=r+dr,first=null,fi=-1; while(rr>=0&&rr<ROWS){const p=b[rr*COLS+c];if(p){first=p;fi=rr;break;}rr+=dr;}
+    if(first&&first.revealed&&first.color!==color&&first.type==='R')pen+=42;
+    if(first){let r2=fi+dr,sec=null;while(r2>=0&&r2<ROWS){const p=b[r2*COLS+c];if(p){sec=p;break;}r2+=dr;}
+      if(sec&&sec.revealed&&sec.color!==color&&sec.type==='C')pen+=26;} }
+  // 橫行
+  for(const dc of[-1,1]){ let cc2=c+dc,first=null,fc=-1; while(cc2>=0&&cc2<COLS){const p=b[r*COLS+cc2];if(p){first=p;fc=cc2;break;}cc2+=dc;}
+    if(first&&first.revealed&&first.color!==color&&first.type==='R')pen+=30;
+    if(first){let c2=fc+dc,sec=null;while(c2>=0&&c2<COLS){const p=b[r*COLS+c2];if(p){sec=p;break;}c2+=dc;}
+      if(sec&&sec.revealed&&sec.color!==color&&sec.type==='C')pen+=18;} }
+  return def*10 - pen;
+}
+// 估值（紅方視角，正值利紅）
+function eEvalRed(b){ let s=0, rg=-1, bg=-1;
+  for(let i=0;i<N;i++){ const p=b[i]; if(!p)continue; const r=Math.floor(i/COLS), c=i%COLS;
+    let v=EVAL_VAL[p.type];
+    if(p.revealed){ v+=eePST(p.type,r,c,p.color); if(p.type==='G'){ if(p.color==='red')rg=i; else bg=i; } }
+    else v*=0.9;                                 // 暗子折價（翻開＝資訊與發展）
+    s += p.color==='red'? v : -v; }
+  s += eeKing(b,'red',rg) - eeKing(b,'black',bg);
+  return s; }
+const eOther=s=>s==='red'?'black':'red';
+const eEval=(b,side)=>side==='red'?eEvalRed(b):-eEvalRed(b);
+
+// make / unmake（含增量雜湊）
+function eMake(b,m){ const mv=b[m.from],cp=b[m.to]; m._cap=cp; m._wr=mv.revealed;
+  curHash^=ZOB[m.from][eStateIdx(mv)]; if(cp)curHash^=ZOB[m.to][eStateIdx(cp)];
+  b[m.to]=mv; b[m.from]=null; if(!mv.revealed)mv.revealed=true;
+  curHash^=ZOB[m.to][eStateIdx(mv)]; curHash=(curHash^ZSIDE)>>>0; }
+function eUnmake(b,m){ const mv=b[m.to]; curHash=(curHash^ZSIDE)>>>0; curHash^=ZOB[m.to][eStateIdx(mv)];
+  mv.revealed=m._wr; b[m.from]=mv; b[m.to]=m._cap||null;
+  curHash^=ZOB[m.from][eStateIdx(mv)]; if(m._cap)curHash^=ZOB[m.to][eStateIdx(m._cap)]; curHash>>>=0; }
+
+const EMATE=50000, EINF=1e9; let eNodes=0; let ETT=new Map();
+function eOrder(moves,b,key){
+  for(const m of moves){ let s=0; const t=b[m.to]; if(t)s=10*EVAL_VAL[eSpecType(t)]-EVAL_VAL[eSpecType(b[m.from])]; if(!b[m.from].revealed)s+=5; m._o=s; }
+  if(key){ const e=ETT.get(key); if(e&&e.mf!=null){ for(const m of moves) if(m.from===e.mf&&m.to===e.mt) m._o+=1e7; } }
+  moves.sort((x,y)=>y._o-x._o); }
+function eQuiesce(b,side,alpha,beta,ply){ eNodes++;
+  let stand=eEval(b,side); if(stand>=beta)return beta; if(stand>alpha)alpha=stand; if(ply>28)return alpha;
+  const caps=eGenCaptures(b,side);
+  for(const m of caps){ const t=b[m.to]; if(t&&t.type==='G'&&factionOf(t)!==side)return EMATE-ply; }
+  eOrder(caps,b,0);
+  for(const m of caps){ eMake(b,m); const v=-eQuiesce(b,eOther(side),-beta,-alpha,ply+1); eUnmake(b,m);
+    if(v>=beta)return beta; if(v>alpha)alpha=v; }
+  return alpha; }
+function eNega(b,side,depth,alpha,beta,ply){ eNodes++; const a0=alpha; const key=curHash;
+  const e=ETT.get(key);
+  if(e&&e.d>=depth){ if(e.f===0)return e.v; else if(e.f===1){ if(e.v>alpha)alpha=e.v; } else { if(e.v<beta)beta=e.v; } if(alpha>=beta)return e.v; }
+  const moves=eGenMoves(b,side);
+  for(const m of moves){ const t=b[m.to]; if(t&&t.type==='G'&&factionOf(t)!==side)return EMATE-ply; }
+  if(depth<=0)return eQuiesce(b,side,alpha,beta,ply);
+  if(moves.length===0)return -EMATE+ply;
+  eOrder(moves,b,key);
+  let best=-EINF,bf=-1,bt=-1;
+  for(const m of moves){ eMake(b,m); const v=-eNega(b,eOther(side),depth-1,-beta,-alpha,ply+1); eUnmake(b,m);
+    if(v>best){best=v;bf=m.from;bt=m.to;} if(v>alpha)alpha=v; if(alpha>=beta)break; }
+  ETT.set(key,{d:depth,v:best,f:best<=a0?2:best>=beta?1:0,mf:bf,mt:bt});
+  return best; }
+function eRoot(b,side,depth,allow){
+  let moves=legalActionsFor(b,side);
+  if(allow) moves=moves.filter(m=>allow.has(m.from*128+m.to));
+  if(!moves.length)return {move:null,val:-EMATE};
+  for(const m of moves){ const t=b[m.to]; if(t&&t.type==='G'&&t.color!==side)return {move:m,val:EMATE}; }
+  eOrder(moves,b,curHash);
+  let best=-EINF,bestM=moves[0],alpha=-EINF;
+  for(const m of moves){ eMake(b,m); const v=-eNega(b,eOther(side),depth-1,-EINF,-alpha,1); eUnmake(b,m);
+    if(v>best){best=v;bestM=m;} if(v>alpha)alpha=v; }
+  return {move:bestM,val:best}; }
+
+// 信念：尚未現身的棋子集合（全部 − 已翻明子 − 已被吃），皆為公開資訊
+function eRemainingHidden(b,captured){
+  const cnt={red:{R:2,H:2,E:2,A:2,C:2,S:5,G:1},black:{R:2,H:2,E:2,A:2,C:2,S:5,G:1}};
+  for(let i=0;i<N;i++){ const p=b[i]; if(p&&p.revealed)cnt[p.color][p.type]--; }
+  for(const c of captured) cnt[c.color][c.type]--;
+  const list=[]; for(const col of['red','black']) for(const t in cnt[col]) for(let k=0;k<cnt[col][t];k++) list.push({type:t,color:col});
+  return list; }
+function eDeterminize(b,coveredIdx,ms){ const det=new Array(N).fill(null);
+  for(let i=0;i<N;i++){ const p=b[i]; if(p&&p.revealed)det[i]={type:p.type,color:p.color,revealed:true,roleType:p.roleType,roleColor:p.roleColor}; }
+  const pool=ms.slice(); shuffle(pool); let k=0;
+  for(const i of coveredIdx){ const t=pool[k++]||{type:'S',color:b[i].roleColor}; det[i]={type:t.type,color:t.color,revealed:false,roleType:b[i].roleType,roleColor:b[i].roleColor}; }
+  return det; }
+
+// 多樣本投票，回傳 {from,to}
+function engineChoose(b,side,captured,opts){
+  const depth=opts.depth, budget=opts.budget, maxS=opts.maxSamples;
+  const coveredIdx=[]; for(let i=0;i<N;i++){ const p=b[i]; if(p&&!p.revealed)coveredIdx.push(i); }
+  const ms=eRemainingHidden(b,captured);
+  const det0=eDeterminize(b,coveredIdx,ms);
+  // 根節點著法：用實際對局的合法著(已濾掉送帥與長將禁著)；著法集合與決定化無關
+  const rootMoves=gameLegalMoves(side); if(!rootMoves.length)return null;
+  for(const m of rootMoves){ const t=det0[m.to]; if(t&&t.type==='G'&&t.color!==side)return {from:m.from,to:m.to}; } // 立即將死
+  const allow=new Set(rootMoves.map(m=>m.from*128+m.to));
+  const votes=new Map(),vsum=new Map(),seen=new Map();
+  const t0=Date.now(); let samples=0;
+  while(samples<maxS && (samples<2 || Date.now()-t0<budget)){
+    const det=eDeterminize(b,coveredIdx,ms); ETT=new Map(); eInitHash(det,side);
+    const r=eRoot(det,side,depth,allow);
+    if(r.move){ const k=r.move.from*128+r.move.to; votes.set(k,(votes.get(k)||0)+1); vsum.set(k,(vsum.get(k)||0)+r.val); seen.set(k,{from:r.move.from,to:r.move.to}); }
+    samples++;
+  }
+  let bestK=null,bv=-1,bs=-EINF;
+  for(const[k,vc]of votes){ const sm=vsum.get(k); if(vc>bv||(vc===bv&&sm>bs)){ bv=vc; bs=sm; bestK=k; } }
+  return bestK!=null? seen.get(bestK) : {from:rootMoves[0].from,to:rootMoves[0].to};
+}
+
+/* ===================== 重複局面：長將禁著 + 和棋判定 ===================== */
+function posKey(b,side){ let h=0; for(let i=0;i<N;i++){ const p=b[i]; if(p)h^=ZOB[i][eStateIdx(p)]; } if(side==='black')h^=ZSIDE; return h>>>0; }
+// 此著是否為「長將」禁著：走完會讓對方被將，且該將軍局面已出現過兩次(這步將成第三次)
+function wouldRepeatCheck(m, side){
+  if(!board[m.from] || !board[m.from].revealed) return false;   // 暗子一動就翻面→局面必為全新，不可能重複
+  if(board[m.to] && board[m.to].type==='G') return false;       // 直接吃帥=獲勝，不算
+  const sim=board.slice(); sim[m.to]=board[m.from]; sim[m.from]=null;
+  const opp = side==='red'?'black':'red';
+  if(!inCheck(sim, opp)) return false;                          // 沒將軍→非長將
+  return (posSeen.get(posKey(sim,opp))||0) >= 2;                // 第三次出現的將軍局面→禁著
+}
+// 實際對局的合法著：濾掉送帥(legalActionsFor已濾) + 長將禁著
+function gameLegalMoves(side){ return legalActionsFor(board,side).filter(m=>!wouldRepeatCheck(m,side)); }
+
+function applyAction(board, act){
+  const mover=board[act.from], target=board[act.to];
+  let generalCaptured=null, captured=null;
+  if(target){ captured={type:target.type,color:target.color,revealed:target.revealed};
+    if(target.type==='G') generalCaptured=target.color; }
+  board[act.to]=mover; board[act.from]=null;
+  let revealedInfo=null;
+  if(!mover.revealed){ mover.revealed=true; revealedInfo={type:mover.type,color:mover.color}; }
+  return {generalCaptured, revealedInfo, captured};
+}
+
+// 明子是否將軍：對方明子或飛將攻擊到 color 的帥
+function inCheck(board, color){
+  let gi=-1; for(let i=0;i<N;i++){ const p=board[i]; if(p&&p.revealed&&p.type==='G'&&p.color===color){gi=i;break;} }
+  if(gi<0) return false;
+  for(let i=0;i<N;i++){ const p=board[i]; if(!p||!p.revealed||p.color===color)continue;
+    const g=geo(board,i,p.type,p.color); if(g.caps.includes(gi)) return true; }
+  return false;
+}
+function countByState(board,color){ let up=0,dn=0; for(const p of board){ if(!p)continue;
+  if(!p.revealed)dn++; else if(p.color===color)up++; } return {up,dn:dn}; }
+function countHidden(board){ let n=0; for(const p of board) if(p&&!p.revealed)n++; return n; }
+function countHiddenColor(board,color){ let n=0; for(const p of board) if(p&&!p.revealed&&p.roleColor===color)n++; return n; }
+function countRevealed(board,color){ let n=0; for(const p of board) if(p&&p.revealed&&p.color===color)n++; return n; }
+function nameTag(color,type){ return `<span class="${color==='red'?'r':'b'}">${NAMES[color][type]}</span>`; }
+
+/* ===================== 狀態 ===================== */
+let board=[], turn='red', over=false, vsAI=false, locked=false, idle=0, captured=[];
+let aiMode=0, aiLevel='normal';   // 0 本機雙人 / 1 對電腦·普通 / 2 對電腦·困難
+let selected=null, legal=new Map(); // to -> act
+let lastMove=null, freshCap=-1;   // 上一步軌跡 / 最新被吃的子在 captured 中的索引
+let posSeen=new Map();            // 局面重複計數（Zobrist），供長將禁著與和棋判定
+const $=id=>document.getElementById(id);
+const svg=$('board');
+
+function newGame(){
+  board=setupBoard(); turn='red'; over=false; locked=false; idle=0; captured=[];
+  selected=null; legal.clear(); lastMove=null; freshCap=-1;
+  posSeen=new Map(); posSeen.set(posKey(board,'red'),1);
+  $('winModal').classList.remove('show');
+  $('name1').textContent = vsAI?'電腦':'黑方';
+  render();
+  setStatus('紅方先手 — 移動你半邊的暗子或主帥;暗子依「原位」棋種行動,翻面才知真身');
+}
+function setStatus(html){ $('status').innerHTML=html; }
+function toast(html){ const t=$('toast'); t.innerHTML=html; t.classList.add('show'); clearTimeout(t._t); t._t=setTimeout(()=>t.classList.remove('show'),1400); }
+
+/* ===================== SVG 繪製 ===================== */
+const SP=1, M=0.72, BW=8*SP+2*M, BH=9*SP+2*M;
+const PX=(c)=>M+c*SP, PY=(r)=>M+r*SP, R_PIECE=0.46;
+function render(animTo){
+  svg.setAttribute('viewBox',`0 0 ${BW} ${BH}`);
+  let s=`<rect x="0" y="0" width="${BW}" height="${BH}" fill="var(--board)" rx="0.25"/>`;
+  // 格線
+  const L=(x1,y1,x2,y2,w=0.035)=>`<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="var(--board-line)" stroke-width="${w}" stroke-linecap="round"/>`;
+  for(let r=0;r<ROWS;r++) s+=L(PX(0),PY(r),PX(8),PY(r));
+  for(let c=0;c<COLS;c++){
+    if(c===0||c===8){ s+=L(PX(c),PY(0),PX(c),PY(9)); }
+    else { s+=L(PX(c),PY(0),PX(c),PY(4)); s+=L(PX(c),PY(5),PX(c),PY(9)); }
+  }
+  // 九宮斜線
+  s+=L(PX(3),PY(0),PX(5),PY(2)); s+=L(PX(5),PY(0),PX(3),PY(2));
+  s+=L(PX(3),PY(7),PX(5),PY(9)); s+=L(PX(5),PY(7),PX(3),PY(9));
+  // 楚河漢界
+  s+=`<text x="${PX(2)}" y="${(PY(4)+PY(5))/2}" font-size="0.5" fill="var(--board-line)" text-anchor="middle" dominant-baseline="central" opacity="0.7" letter-spacing="0.08">楚河</text>`;
+  s+=`<text x="${PX(6)}" y="${(PY(4)+PY(5))/2}" font-size="0.5" fill="var(--board-line)" text-anchor="middle" dominant-baseline="central" opacity="0.7" letter-spacing="0.08">漢界</text>`;
+
+  // 上一步軌跡：起點(琥珀虛框) + 終點(琥珀底圈，棋子上方另畫實圈)
+  if(lastMove){
+    const [fr,fc]=rc(lastMove.from), [tr,tc]=rc(lastMove.to);
+    s+=`<circle cx="${PX(fc)}" cy="${PY(fr)}" r="${R_PIECE-0.04}" fill="var(--amber)" opacity="0.16"/>`;
+    s+=`<circle cx="${PX(fc)}" cy="${PY(fr)}" r="${R_PIECE-0.04}" fill="none" stroke="var(--amber)" stroke-width="0.05" stroke-dasharray="0.18 0.14" opacity="0.8"/>`;
+    s+=`<circle cx="${PX(tc)}" cy="${PY(tr)}" r="${R_PIECE+0.12}" fill="var(--amber)" opacity="0.14"/>`;
+  }
+
+  // 落點提示
+  for(const [to,act] of legal){ const [r,c]=rc(to); const x=PX(c),y=PY(r);
+    if(act.cap) s+=`<circle cx="${x}" cy="${y}" r="${R_PIECE+0.08}" fill="none" stroke="var(--jade-bright)" stroke-width="0.07" stroke-dasharray="0.22 0.16"/>`;
+    else s+=`<circle cx="${x}" cy="${y}" r="0.14" fill="var(--jade)" opacity="0.9"/>`;
+  }
+
+  // 棋子
+  for(let i=0;i<N;i++){ const p=board[i]; if(!p)continue; const [r,c]=rc(i); const x=PX(c),y=PY(r);
+    const sel = selected===i;
+    const grow = animTo===i? ` style="transform-box:fill-box;transform-origin:center;animation:pop .25s ease"`:'';
+    s+=`<g data-i="${i}"${grow}>`;
+    if(!p.revealed){
+      s+=`<circle cx="${x}" cy="${y}" r="${R_PIECE}" fill="#4a361e" stroke="var(--gold)" stroke-width="0.06"/>`;
+      s+=`<circle cx="${x}" cy="${y}" r="${R_PIECE-0.1}" fill="none" stroke="var(--gold)" stroke-width="0.03" opacity="0.7"/>`;
+      s+=`<rect x="${x-0.13}" y="${y-0.13}" width="0.26" height="0.26" fill="none" stroke="var(--gold-bright)" stroke-width="0.045" transform="rotate(45 ${x} ${y})"/>`;
+    } else {
+      const col=p.color==='red'?'var(--zhu)':'var(--dai-ink)';
+      s+=`<circle cx="${x}" cy="${y}" r="${R_PIECE}" fill="var(--paper)" stroke="${col}" stroke-width="0.07"/>`;
+      s+=`<circle cx="${x}" cy="${y}" r="${R_PIECE-0.08}" fill="none" stroke="${col}" stroke-width="0.025" opacity="0.55"/>`;
+      s+=`<text x="${x}" y="${y+0.02}" font-size="0.62" fill="${col}" text-anchor="middle" dominant-baseline="central">${NAMES[p.color][p.type]}</text>`;
+    }
+    if(sel) s+=`<circle cx="${x}" cy="${y}" r="${R_PIECE+0.1}" fill="none" stroke="var(--jade-bright)" stroke-width="0.08"/>`;
+    s+=`</g>`;
+  }
+  // 透明點擊熱區
+  for(let i=0;i<N;i++){ const [r,c]=rc(i); s+=`<circle data-i="${i}" cx="${PX(c)}" cy="${PY(r)}" r="0.5" fill="transparent"/>`; }
+  // 上一步終點：棋子上方的琥珀實圈（最顯眼）
+  if(lastMove){ const [tr,tc]=rc(lastMove.to); s+=`<circle cx="${PX(tc)}" cy="${PY(tr)}" r="${R_PIECE+0.12}" fill="none" stroke="var(--amber-bright)" stroke-width="0.07" pointer-events="none"/>`; }
+
+  svg.innerHTML=s;
+
+  // HUD
+  $('up0').textContent=countRevealed(board,'red');
+  $('up1').textContent=countRevealed(board,'black');
+  $('dn0').textContent=countHiddenColor(board,'red');
+  $('dn1').textContent=countHiddenColor(board,'black');
+  $('seat0').classList.toggle('active', turn==='red'&&!over);
+  $('seat1').classList.toggle('active', turn==='black'&&!over);
+  renderTray();
+}
+function renderTray(){
+  const t=$('tray');
+  if(!captured.length){ t.innerHTML='<span class="tray-label">被吃</span><span class="tray-empty">尚無</span>'; return; }
+  t.innerHTML='<span class="tray-label">被吃</span>'+captured.map((p,idx)=>
+    `<span class="cap ${p.color==='red'?'red':'black'}${idx===freshCap?' fresh':''}">${NAMES[p.color][p.type]}</span>`).join('');
+}
+// pop keyframe
+const st=document.createElement('style'); st.textContent='@keyframes pop{0%{transform:scale(.55)}100%{transform:scale(1)}}'; document.head.appendChild(st);
+
+/* ===================== 互動 ===================== */
+svg.addEventListener('click', e=>{
+  const g=e.target.closest('[data-i]'); if(!g)return;
+  if(over||locked)return;
+  if(vsAI && turn==='black')return;
+  handleTap(+g.dataset.i);
+});
+function selectable(i){ const p=board[i]; if(!p)return false; return factionOf(p)===turn; } // 依位子陣營（暗子用 roleColor）
+function handleTap(i){
+  if(selected!==null && legal.has(i)){ doAction(legal.get(i)); return; }
+  if(selectable(i)){ selectPiece(i); return; }
+  const p=board[i];
+  if(p && selected===null){ toast(p.revealed?'那是對方的明子':'那是對方半邊的暗子,不能動'); }
+  selected=null; legal.clear(); render();
+}
+function selectPiece(i){
+  selected=i; legal.clear();
+  for(const a of gameLegalMoves(turn)){ if(a.from===i) legal.set(a.to,a); }
+  render();
+}
+function doAction(act){
+  const res=applyAction(board,act);
+  selected=null; legal.clear();
+  lastMove={from:act.from,to:act.to};
+  if(res.captured){ idle=0; captured.push({type:res.captured.type,color:res.captured.color}); freshCap=captured.length-1; }
+  else { freshCap=-1; idle = res.revealedInfo ? 0 : idle+1; }  // 吃子或翻子=有進展
+  render(act.to);
+
+  let msg='';
+  if(res.revealedInfo) msg+='翻'+nameTag(res.revealedInfo.color,res.revealedInfo.type);
+  if(res.captured)     msg+=(msg?' · ':'')+'吃'+nameTag(res.captured.color,res.captured.type);
+  if(msg) toast(msg);
+
+  // 勝負：吃帥
+  if(res.generalCaptured){ return endGame(res.generalCaptured==='red'?'black':'red','擒獲對方主帥'); }
+  // 換手
+  turn = turn==='red'?'black':'red';
+  // 局面重複計數（吃子/翻子會永久改變盤面，不會與舊局面相同）
+  const key=posKey(board,turn); const rep=(posSeen.get(key)||0)+1; posSeen.set(key,rep);
+  if(rep>=3){
+    if(inCheck(board,turn)) return endGame(turn,'對方長將,判負');   // 被將方獲勝
+    return endGame(null,'三次重複局面,和局');
+  }
+  if(idle>=50){ return endGame(null,'久無進展,和局'); }
+  if(gameLegalMoves(turn).length===0){ return endGame(turn==='red'?'black':'red','無合法著可走(被將死/困斃/長將變不出)'); }
+  render();
+  announce();
+  if(vsAI && turn==='black' && !over) scheduleAI();
+}
+function announce(){
+  const t = turn==='red'?'<span class="hot">紅方</span>':'<span class="hot">黑方</span>';
+  let msg=`輪到 ${t} — 走暗子或移動明子`;
+  if(inCheck(board,turn)) msg=`${t} <span class="warn">被將軍!</span>請應將`;
+  setStatus(msg);
+}
+function endGame(winner, reason){
+  over=true; selected=null; legal.clear(); render();
+  const wm=$('winModal');
+  if(!winner){ $('winTitle').textContent='和局'; $('winDesc').textContent=reason; }
+  else { $('winTitle').textContent=(winner==='red'?'紅方':'黑方')+' 獲勝!'; $('winDesc').textContent=reason; }
+  setTimeout(()=>wm.classList.add('show'),700);
+}
+
+/* ===================== 電腦（黑方）以 PIMC 引擎思考 ===================== */
+const AI_CFG={ normal:{depth:2,budget:450,maxSamples:18}, hard:{depth:3,budget:1000,maxSamples:28} };
+function scheduleAI(){
+  locked=true;
+  setStatus('<span class="hot">電腦</span> 思考中…');
+  // 先讓「思考中」畫面繪出，再進行(同步)運算
+  setTimeout(aiMove, 60);
+}
+function aiMove(){
+  if(over){ locked=false; return; }
+  if(gameLegalMoves('black').length===0){ locked=false; return endGame('red','無合法著可走(被將死/困斃/長將變不出)'); }
+  const cfg=AI_CFG[aiLevel]||AI_CFG.normal;
+  let pick=null;
+  try{ pick=engineChoose(board,'black',captured,cfg); }catch(err){ pick=null; }
+  if(!pick){ const acts=gameLegalMoves('black'); pick=acts[0]; if(!pick){ locked=false; return endGame('red','無合法著可走'); } }
+  locked=false;
+  // 將引擎回傳的 {from,to} 對回合法著法物件
+  const act=gameLegalMoves('black').find(a=>a.from===pick.from&&a.to===pick.to) || {from:pick.from,to:pick.to,covered:!board[pick.from].revealed,cap:!!board[pick.to]};
+  doAction(act);
+}
+
+/* ===================== UI 綁定 ===================== */
+$('newBtn').onclick=()=>newGame();
+$('winNew').onclick=()=>newGame();
+$('modeBtn').onclick=()=>{
+  aiMode=(aiMode+1)%3;                  // 0 本機雙人 / 1 對電腦(普通) / 2 對電腦(困難)
+  vsAI = aiMode!==0;
+  aiLevel = aiMode===2?'hard':'normal';
+  $('modeLabel').textContent = aiMode===0?'本機雙人':(aiMode===1?'對電腦·普通':'對電腦·困難');
+  newGame();
+};
+$('rulesBtn').onclick=()=>$('rulesModal').classList.add('show');
+$('closeRules').onclick=()=>$('rulesModal').classList.remove('show');
+$('rulesModal').onclick=e=>{ if(e.target===$('rulesModal'))$('rulesModal').classList.remove('show'); };
+
+newGame();
+</script>
+</body>
+</html>
